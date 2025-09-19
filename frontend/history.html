@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Historial - Quizz App</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<link rel="shortcut icon" href="images/logo.ico" type="image/x-icon">
+<style>
+  body {
+    font-family:'Orbitron', sans-serif;
+    background: linear-gradient(to bottom, #e0f7ff, #ffffff);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    color:#0d6efd;
+  }
+  h1 { margin:20px 0; text-align:center; }
+  table {
+    border-collapse: collapse;
+    width:100%;
+    max-width:700px;
+    background:#fff;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 8px 20px rgba(0,0,0,0.1);
+    margin-bottom:30px;
+  }
+  th, td {
+    padding:12px 15px;
+    text-align:center;
+    border-bottom:1px solid #ddd;
+    font-size:14px;
+  }
+  th { background:#0d6efd; color:#fff; }
+  tr:nth-child(even) { background:#f2f2f2; }
+  button {
+    padding:10px 15px;
+    margin-bottom:20px;
+    border:none;
+    border-radius:8px;
+    background:#0d6efd;
+    color:#fff;
+    cursor:pointer;
+  }
+  button:hover { background:#00bfff; }
+</style>
+</head>
+<body>
+
+<h1>Historial de Intentos</h1>
+<button id="backHome">⬅ Volver al Home</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Puntaje</th>
+      <th>Tiempo (s)</th>
+      <th>Correctas</th>
+      <th>Incorrectas</th>
+      <th>Sin responder</th>
+      <th>Fecha</th>
+    </tr>
+  </thead>
+  <tbody id="historyBody">
+    <!-- Datos cargados desde JS -->
+  </tbody>
+</table>
+
+<script>
+const historyBody = document.getElementById('historyBody');
+const token = localStorage.getItem('token');
+
+if(!token){
+  alert("No hay token, redirigiendo a index.html...");
+  window.location.href = 'index.html';
+}
+
+async function loadHistory(){
+  try{
+    const res = await fetch('/api/user/history', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+
+    historyBody.innerHTML = '';
+
+    if(res.ok){
+      data.sort((a,b) => new Date(b.date) - new Date(a.date)); // más reciente primero
+      data.forEach((attempt, i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${attempt.score}</td>
+          <td>${attempt.totalTime}</td>
+          <td>${attempt.correct}</td>
+          <td>${attempt.incorrect}</td>
+          <td>${attempt.unanswered}</td>
+          <td>${new Date(attempt.date).toLocaleString()}</td>
+        `;
+        historyBody.appendChild(tr);
+      });
+    } else {
+      historyBody.innerHTML = `<tr><td colspan="7">${data.msg || 'Error al cargar historial'}</td></tr>`;
+    }
+  } catch(err){
+    console.error(err);
+    historyBody.innerHTML = `<tr><td colspan="7">Error al cargar historial</td></tr>`;
+  }
+}
+
+document.getElementById('backHome').addEventListener('click', ()=>{
+  window.location.href='home.html';
+});
+
+loadHistory();
+</script>
+
+</body>
+</html>

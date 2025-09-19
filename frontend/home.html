@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Home - Quizz App</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<link rel="shortcut icon" href="images/logo.ico" type="image/x-icon">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Orbitron', sans-serif;
+    background: linear-gradient(to bottom, #e0f7ff, #ffffff);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    color:#0d6efd;
+  }
+  h1 { margin:20px 0; text-align:center; color:#0d6efd; }
+  .buttons {
+    display:flex;
+    flex-wrap:wrap;
+    gap:15px;
+    justify-content:center;
+    margin-bottom:20px;
+  }
+  .buttons button {
+    padding:12px 20px;
+    font-size:16px;
+    font-weight:bold;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#0d6efd;
+    color:#fff;
+    transition:background 0.3s ease, transform 0.2s ease;
+  }
+  .buttons button:hover { background:#00bfff; transform:translateY(-2px); }
+
+  table {
+    border-collapse: collapse;
+    width:100%;
+    max-width:700px;
+    background:#fff;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 8px 20px rgba(0,0,0,0.1);
+    margin-bottom:30px;
+  }
+  th, td {
+    padding:12px 15px;
+    text-align:center;
+    border-bottom:1px solid #ddd;
+    font-size:14px;
+  }
+  th { background:#0d6efd; color:#fff; }
+  tr:nth-child(even) { background:#f2f2f2; }
+
+  .loader-container {
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background: rgba(255,255,255,0.7);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+    display:none;
+  }
+  .loader {
+    border:8px solid #f3f3f3;
+    border-top:8px solid #0d6efd;
+    border-radius:50%;
+    width:80px; height:80px;
+    animation:spin 1s linear infinite;
+    box-shadow:0 0 20px rgba(0,191,255,0.5);
+  }
+  @keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+
+  @media(max-width: 400px){
+    .buttons button { font-size:14px; padding:10px 15px; }
+    th, td { font-size:12px; padding:8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<h1 id="welcome">Bienvenido</h1>
+
+<div class="buttons">
+  <button id="startQuiz">🚗 Empezar Quizz</button>
+  <button id="history">📜 Historial personal</button>
+  <button id="logout">🚪 Cerrar sesión</button>
+  <button id="rulesBtn">📜 Reglas</button>
+
+</div>
+
+<table id="leaderboard">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Username</th>
+      <th>Puntaje</th>
+      <th>Tiempo (s)</th>
+      <th>Fecha</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Datos cargados desde JS -->
+  </tbody>
+</table>
+
+<div class="loader-container" id="loaderContainer">
+  <div class="loader"></div>
+</div>
+
+<div id="loadMoreContainer" style="margin-bottom:30px; display:none; text-align:center;">
+  <button id="loadMoreBtn" style="padding:10px 20px; font-size:16px; border:none; border-radius:8px; cursor:pointer; background:#0d6efd; color:#fff;">
+    Ver más
+  </button>
+</div>
+
+<div id="rulesModal" style="
+  display:none; /* 👈 oculto por defecto */
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.7);
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+">
+  <div style="
+    background:#fff;
+    color:#0d6efd;
+    padding:30px 40px;
+    font-size:18px;
+    font-weight:bold;
+    border-radius:12px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5);
+    text-align:center;
+    max-width:400px;
+  ">
+    <h2>📜 Reglas del Quizz</h2>
+    <p>1️⃣ Cada pregunta tiene un tiempo límite de 15 segundos.<br>
+       2️⃣ Responde correctamente para ganar 10 puntos.<br>
+       3️⃣ Si respondes en menos de 3 segundos, ganas 5 puntos extra.<br>
+       4️⃣ Puedes ver tu progreso en la parte inferior.<br>
+       5️⃣ El quizz termina automáticamente al finalizar todas las preguntas.</p>
+    <button id="closeRules" style="
+      margin-top:15px;
+      padding:8px 20px;
+      border:none;
+      border-radius:8px;
+      background:#0d6efd;
+      color:#fff;
+      cursor:pointer;
+      font-weight:bold;
+    ">Cerrar</button>
+  </div>
+</div>
+
+
+<script>
+const welcome = document.getElementById('welcome');
+const leaderboardBody = document.querySelector('#leaderboard tbody');
+const loaderContainer = document.getElementById('loaderContainer');
+const loadMoreContainer = document.getElementById('loadMoreContainer');
+const loadMoreBtn = document.getElementById('loadMoreBtn');
+
+let token = localStorage.getItem('token');
+let tokenValidated = false;
+
+async function validateToken() {
+  if (!token || tokenValidated) return false;
+  loaderContainer.style.display = 'flex';
+  try {
+    const res = await fetch('/api/auth/validate-token', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    // Solo borrar token si es 401 o 403
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      window.location.replace('index.html');
+      return false;
+    }
+
+    const data = await res.json();
+    if (!data.username) throw new Error('Token inválido');
+
+    welcome.innerText = `Bienvenido, ${data.username}`;
+    tokenValidated = true;
+    return true;
+
+  } catch(err) {
+    console.warn('validateToken error:', err.message);
+    // ⚠️ No borrar token por errores temporales
+    return false;
+  } finally {
+    loaderContainer.style.display = 'none';
+  }
+}
+
+// Cargar leaderboard solo si el token es válido
+async function initHome() {
+  const valid = await validateToken();
+  if (valid) loadLeaderboard();
+}
+
+initHome();
+
+// LEADERBOARD
+let bestScores = [];
+let displayedCount = 0;
+
+async function loadLeaderboard() {
+  loaderContainer.style.display = 'flex';
+  try {
+    const res = await fetch('/api/user/leaderboard', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.msg || 'Error al cargar leaderboard');
+
+    leaderboardBody.innerHTML = '';
+    bestScores = Object.values(
+      data.reduce((acc, item) => {
+        if (!acc[item.username] ||
+            item.score > acc[item.username].score ||
+            (item.score === acc[item.username].score && item.time < acc[item.username].time) ||
+            (item.score === acc[item.username].score && item.time === acc[item.username].time && new Date(item.date) < new Date(acc[item.username].date))
+        ) acc[item.username] = item;
+        return acc;
+      }, {})
+    );
+
+    bestScores.sort((a,b) => b.score - a.score || a.time - b.time || new Date(a.date) - new Date(b.date));
+
+    displayedCount = 0;
+    renderLeaderboardChunk();
+
+  } catch(err){
+    console.error("Error en loadLeaderboard:", err);
+    leaderboardBody.innerHTML = `<tr><td colspan="5">No se pudieron cargar los datos</td></tr>`;
+    loadMoreContainer.style.display = 'none';
+  } finally {
+    loaderContainer.style.display = 'none';
+  }
+}
+
+function renderLeaderboardChunk(){
+  const nextChunk = bestScores.slice(displayedCount, displayedCount + 10);
+  nextChunk.forEach((user,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${displayedCount + i + 1}</td>
+      <td>${user.username}</td>
+      <td>${user.score}</td>
+      <td>${user.time}</td>
+      <td>${new Date(user.date).toLocaleDateString()}</td>
+    `;
+    leaderboardBody.appendChild(tr);
+  });
+  displayedCount += nextChunk.length;
+
+  loadMoreContainer.style.display = displayedCount < bestScores.length ? 'block' : 'none';
+}
+
+loadMoreBtn.addEventListener('click', ()=> renderLeaderboardChunk());
+
+// BOTONES
+document.getElementById('startQuiz').addEventListener('click', async ()=>{
+  try {
+    const res = await fetch('data/questions.json');
+    const data = await res.json();
+    if (data.questions && data.questions.length > 0){
+      window.location.href='quiz.html';
+    } else {
+      alert('No hay preguntas disponibles aún.');
+    }
+  } catch(err){
+    console.error("Error al iniciar el quizz:", err);
+    alert('Error al iniciar el quizz.');
+  }
+});
+
+document.getElementById('history').addEventListener('click', ()=> window.location.href='history.html');
+document.getElementById('logout').addEventListener('click', ()=>{
+  localStorage.removeItem('token');
+  window.location.href='index.html';
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const rulesBtn = document.getElementById('rulesBtn');
+const rulesModal = document.getElementById('rulesModal');
+const closeRules = document.getElementById('closeRules');
+
+rulesBtn.addEventListener('click', () => {
+  rulesModal.style.display = 'flex';
+});
+
+closeRules.addEventListener('click', () => {
+  rulesModal.style.display = 'none';
+});
+
+// Opcional: cerrar modal si se hace clic fuera del cuadro
+rulesModal.addEventListener('click', e => {
+  if (e.target === rulesModal) rulesModal.style.display = 'none';
+});
+
+</script>
+
+
+
+</body>
+</html>

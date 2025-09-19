@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Verificación de correo</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<link rel="shortcut icon" href="images/logo.ico" type="image/x-icon">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Orbitron', sans-serif;
+    background: linear-gradient(to bottom, #e0f7ff, #ffffff);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    color: #0d6efd;
+    padding: 20px;
+    position: relative;
+  }
+
+  h1 {
+    margin-bottom: 20px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+
+  #message {
+    padding: 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    display: none;
+    max-width: 360px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    animation: fadein 0.5s;
+  }
+
+  #message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  #message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Loader centrado y grande */
+  .loader-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    display: flex;
+  }
+
+  .loader {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #0d6efd;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 20px rgba(0,191,255,0.5);
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Responsive */
+  @media (max-width: 400px) {
+    #message { font-size: 14px; padding: 15px; }
+    .loader { width: 60px; height: 60px; border-width: 6px; }
+  }
+
+  @media (max-width: 320px) {
+    h1 { font-size: 18px; }
+    #message { font-size: 12px; padding: 12px; }
+    .loader { width: 50px; height: 50px; border-width: 5px; }
+  }
+</style>
+</head>
+<body>
+  <h1>Verificación de correo</h1>
+
+  <div class="loader-container" id="loaderContainer">
+    <div class="loader"></div>
+  </div>
+
+  <div id="message"></div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const token = params.get('token');
+const msgDiv = document.getElementById('message');
+const loaderContainer = document.getElementById('loaderContainer');
+
+if (token) {
+  loaderContainer.style.display = 'flex';
+  fetch(`/api/auth/verify-email?token=${token}`)
+    .then(res => res.json())
+    .then(data => {
+      loaderContainer.style.display = 'none';
+      msgDiv.innerText = data.msg;
+      msgDiv.className = data.msg.includes('✅') ? 'success' : 'error';
+      msgDiv.style.display = 'block';
+
+      // Redirigir a login después de 1.5 segundos
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 1500);
+    })
+    .catch(err => {
+      loaderContainer.style.display = 'none';
+      msgDiv.innerText = 'Error al verificar el correo';
+      msgDiv.className = 'error';
+      msgDiv.style.display = 'block';
+      console.error(err);
+    });
+} else {
+  loaderContainer.style.display = 'none';
+  msgDiv.innerText = 'Token no proporcionado';
+  msgDiv.className = 'error';
+  msgDiv.style.display = 'block';
+}
+</script>
+</body>
+</html>
